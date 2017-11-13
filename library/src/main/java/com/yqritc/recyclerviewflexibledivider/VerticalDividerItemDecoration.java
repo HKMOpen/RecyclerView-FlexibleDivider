@@ -3,6 +3,8 @@ package com.yqritc.recyclerviewflexibledivider;
 import android.content.Context;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.support.annotation.DimenRes;
+import android.support.v4.view.ViewCompat;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
 
@@ -13,7 +15,7 @@ public class VerticalDividerItemDecoration extends FlexibleDividerDecoration {
 
     private MarginProvider mMarginProvider;
 
-    private VerticalDividerItemDecoration(Builder builder) {
+    protected VerticalDividerItemDecoration(Builder builder) {
         super(builder);
         mMarginProvider = builder.mMarginProvider;
     }
@@ -21,19 +23,44 @@ public class VerticalDividerItemDecoration extends FlexibleDividerDecoration {
     @Override
     protected Rect getDividerBound(int position, RecyclerView parent, View child) {
         Rect bounds = new Rect(0, 0, 0, 0);
+        int transitionX = (int) ViewCompat.getTranslationX(child);
+        int transitionY = (int) ViewCompat.getTranslationY(child);
         RecyclerView.LayoutParams params = (RecyclerView.LayoutParams) child.getLayoutParams();
         bounds.top = parent.getPaddingTop() +
-                mMarginProvider.dividerTopMargin(position, parent);
+                mMarginProvider.dividerTopMargin(position, parent) + transitionY;
         bounds.bottom = parent.getHeight() - parent.getPaddingBottom() -
-                mMarginProvider.dividerBottomMargin(position, parent);
+                mMarginProvider.dividerBottomMargin(position, parent) + transitionY;
 
         int dividerSize = getDividerSize(position, parent);
+        boolean isReverseLayout = isReverseLayout(parent);
         if (mDividerType == DividerType.DRAWABLE) {
-            bounds.left = child.getRight() + params.leftMargin;
-            bounds.right = bounds.left + dividerSize;
+            // set left and right position of divider
+            if (isReverseLayout) {
+                bounds.right = child.getLeft() - params.leftMargin + transitionX;
+                bounds.left = bounds.right - dividerSize;
+            } else {
+                bounds.left = child.getRight() + params.rightMargin + transitionX;
+                bounds.right = bounds.left + dividerSize;
+            }
         } else {
-            bounds.left = child.getRight() + params.leftMargin + dividerSize / 2;
+            // set center point of divider
+            int halfSize = dividerSize / 2;
+            if (isReverseLayout) {
+                bounds.left = child.getLeft() - params.leftMargin - halfSize + transitionX;
+            } else {
+                bounds.left = child.getRight() + params.rightMargin + halfSize + transitionX;
+            }
             bounds.right = bounds.left;
+        }
+
+        if (mPositionInsideItem) {
+            if (isReverseLayout) {
+                bounds.left += dividerSize;
+                bounds.right += dividerSize;
+            } else {
+                bounds.left -= dividerSize;
+                bounds.right -= dividerSize;
+            }
         }
 
         return bounds;
@@ -41,16 +68,15 @@ public class VerticalDividerItemDecoration extends FlexibleDividerDecoration {
 
     @Override
     protected void setItemOffsets(Rect outRect, int position, RecyclerView parent) {
-        int size = getDividerSize(position, parent);
-        if (position == 0) {
-            outRect.set(0, 0, size / 2, 0);
+        if (mPositionInsideItem) {
+            outRect.set(0, 0, 0, 0);
+            return;
+        }
+
+        if (isReverseLayout(parent)) {
+            outRect.set(getDividerSize(position, parent), 0, 0, 0);
         } else {
-            int lastItemSize = getDividerSize(position - 1, parent);
-            if (position == parent.getLayoutManager().getItemCount() - 1) {
-                outRect.set(lastItemSize / 2, 0, size, 0);
-            } else {
-                outRect.set(lastItemSize / 2, 0, size / 2, 0);
-            }
+            outRect.set(0, 0, getDividerSize(position, parent), 0);
         }
     }
 
@@ -74,20 +100,20 @@ public class VerticalDividerItemDecoration extends FlexibleDividerDecoration {
         /**
          * Returns top margin of divider.
          *
-         * @param position Divider position
+         * @param position Divider position (or group index for GridLayoutManager)
          * @param parent   RecyclerView
          * @return top margin
          */
-        public int dividerTopMargin(int position, RecyclerView parent);
+        int dividerTopMargin(int position, RecyclerView parent);
 
         /**
          * Returns bottom margin of divider.
          *
-         * @param position Divider position
+         * @param position Divider position (or group index for GridLayoutManager)
          * @param parent   RecyclerView
          * @return bottom margin
          */
-        public int dividerBottomMargin(int position, RecyclerView parent);
+        int dividerBottomMargin(int position, RecyclerView parent);
     }
 
     public static class Builder extends FlexibleDividerDecoration.Builder<Builder> {
@@ -120,6 +146,19 @@ public class VerticalDividerItemDecoration extends FlexibleDividerDecoration {
                     return bottomMargin;
                 }
             });
+        }
+
+        public Builder margin(int verticalMargin) {
+            return margin(verticalMargin, verticalMargin);
+        }
+
+        public Builder marginResId(@DimenRes int topMarginId, @DimenRes int bottomMarginId) {
+            return margin(mResources.getDimensionPixelSize(topMarginId),
+                    mResources.getDimensionPixelSize(bottomMarginId));
+        }
+
+        public Builder marginResId(@DimenRes int verticalMarginId) {
+            return marginResId(verticalMarginId, verticalMarginId);
         }
 
         public Builder marginProvider(MarginProvider provider) {

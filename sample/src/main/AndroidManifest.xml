@@ -26,6 +26,9 @@
         <activity
             android:name=".ComplexActivity"
             android:label="@string/menu_complex"/>
+        <activity
+            android:name=".SimpleGridActivity"
+            android:label="@string/menu_simple_grid"/>
     </application>
 
 </manifest>
